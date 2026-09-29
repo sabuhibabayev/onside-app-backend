@@ -113,20 +113,19 @@ public class GoalService {
     }
 
     // Mapper: GoalVoteService vasitəsilə user-in səs verib-vermədiyini öyrənir
+    // Mapper: GoalVoteService vasitəsilə user-in səs verib-vermədiyini öyrənir
     private GoalResponse mapToResponse(Goal goal, Long currentUserId) {
         boolean hasVoted = goalVoteService.hasUserVoted(currentUserId, goal.getId());
 
-        GoalResponse response = new GoalResponse(
+        return new GoalResponse(
                 goal.getId(),
                 goal.getUser() != null ? goal.getUser().getFullName() : "Anonim",
                 goal.getVideoUrl(),
                 goal.getDescription(),
                 goal.getVotesCount(),
                 goal.getIsWeeklyWinner(),
-                goal.getCreatedAt()
+                goal.getCreatedAt(),
+                hasVoted // ⭐ 8-ci parametr kimi bura əlavə edirik
         );
-
-        response.setHasVoted(hasVoted);
-        return response;
     }
 }
