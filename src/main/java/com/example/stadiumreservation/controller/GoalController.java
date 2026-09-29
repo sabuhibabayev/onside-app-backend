@@ -24,16 +24,16 @@ public class GoalController {
         return ResponseEntity.ok(goalService.addGoal(request));
     }
 
-    // Bütün videoları səs sırasına görə gətirmək üçün
+    // Bütün videoları səs sırasına görə gətirmək üçün (userId parametr olaraq göndərilə bilər)
     @GetMapping
-    public ResponseEntity<List<GoalResponse>> getAllGoals() {
-        return ResponseEntity.ok(goalService.getAllGoals());
+    public ResponseEntity<List<GoalResponse>> getAllGoals(@RequestParam(required = false) Long userId) {
+        return ResponseEntity.ok(goalService.getAllGoals(userId));
     }
 
-    // Videoya səs vermək üçün
+    // Videoya səs vermək üçün (userId göndərilir)
     @PostMapping("/{id}/vote")
-    public ResponseEntity<GoalResponse> voteForGoal(@PathVariable Long id) {
-        return ResponseEntity.ok(goalService.voteForGoal(id));
+    public ResponseEntity<GoalResponse> voteForGoal(@PathVariable Long id, @RequestParam Long userId) {
+        return ResponseEntity.ok(goalService.voteForGoal(id, userId));
     }
 
     // Həftənin qolunu seçmək üçün

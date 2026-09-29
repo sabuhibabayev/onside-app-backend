@@ -17,4 +17,5 @@ public class GoalResponse {
     private Integer votesCount;
     private Boolean isWeeklyWinner;
     private LocalDateTime createdAt;
+    private boolean hasVoted; // ⭐ Səs verilib-verilmədiyini saxlayan sahə
 }

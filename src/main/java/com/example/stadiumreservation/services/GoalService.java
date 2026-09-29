@@ -7,6 +7,7 @@ import com.example.stadiumreservation.entity.User;
 import com.example.stadiumreservation.repository.GoalRepository;
 import com.example.stadiumreservation.repository.UserRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -17,10 +18,12 @@ public class GoalService {
 
     private final GoalRepository goalRepository;
     private final UserRepository userRepository;
+    private final GoalVoteService goalVoteService; // ⭐ Ayrı servis bura daxil edildi
 
-    public GoalService(GoalRepository goalRepository, UserRepository userRepository) {
+    public GoalService(GoalRepository goalRepository, UserRepository userRepository, GoalVoteService goalVoteService) {
         this.goalRepository = goalRepository;
         this.userRepository = userRepository;
+        this.goalVoteService = goalVoteService;
     }
 
     /**
@@ -34,33 +37,39 @@ public class GoalService {
         goal.setUser(user);
         goal.setVideoUrl(request.getVideoUrl());
         goal.setDescription(request.getDescription());
-        goal.setVotesCount(0); // İlkin səs sayı
-        goal.setIsWeeklyWinner(false); // İlkin olaraq qalib deyil
+        goal.setVotesCount(0);
+        goal.setIsWeeklyWinner(false);
 
         Goal savedGoal = goalRepository.save(goal);
-        return mapToResponse(savedGoal);
+        return mapToResponse(savedGoal, request.getUserId());
     }
 
     /**
      * Bütün qolları səs sayına görə sıralayıb qaytarır
      */
-    public List<GoalResponse> getAllGoals() {
+    public List<GoalResponse> getAllGoals(Long userId) {
         return goalRepository.findAllByOrderByVotesCountDesc()
                 .stream()
-                .map(this::mapToResponse)
+                .map(goal -> mapToResponse(goal, userId))
                 .collect(Collectors.toList());
     }
 
     /**
-     * Qola +1 səs əlavə edir
+     * Qola +1 səs əlavə edir (GoalVoteService vasitəsilə yoxlayaraq)
      */
-    public GoalResponse voteForGoal(Long goalId) {
+    @Transactional
+    public GoalResponse voteForGoal(Long goalId, Long userId) {
+        // 1. GoalVoteService vasitəsilə səsverməni qeydə alırıq (artıq səs veribsə xəta atacaq)
+        goalVoteService.recordVote(userId, goalId);
+
+        // 2. Qolu tapıb səs sayını 1 vahid artırırıq
         Goal goal = goalRepository.findById(goalId)
                 .orElseThrow(() -> new RuntimeException("Qol tapılmadı!"));
 
-        goal.setVotesCount(goal.getVotesCount() + 1); // Səsləri 1 vahid artırırıq
+        goal.setVotesCount(goal.getVotesCount() + 1);
         Goal updatedGoal = goalRepository.save(goal);
-        return mapToResponse(updatedGoal);
+
+        return mapToResponse(updatedGoal, userId);
     }
 
     /**
@@ -72,18 +81,16 @@ public class GoalService {
             throw new RuntimeException("Siyahıda heç bir qol yoxdur!");
         }
 
-        // Əvvəlki qalib varsa statusunu sıfırlayırıq
         goalRepository.findByIsWeeklyWinnerTrue().ifPresent(previousWinner -> {
             previousWinner.setIsWeeklyWinner(false);
             goalRepository.save(previousWinner);
         });
 
-        // 1-ci sıradakı (ən çox səs alan) qolu qalib edirik
         Goal winner = goals.get(0);
         winner.setIsWeeklyWinner(true);
         Goal savedWinner = goalRepository.save(winner);
 
-        return mapToResponse(savedWinner);
+        return mapToResponse(savedWinner, null);
     }
 
     /**
@@ -93,7 +100,6 @@ public class GoalService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("İstifadəçi tapılmadı!"));
 
-        // İstifadəçinin Premium statusunu və müddətini yoxlayırıq
         if (Boolean.FALSE.equals(user.getIsPremium()) ||
                 user.getPremiumExpireDate() == null ||
                 user.getPremiumExpireDate().isBefore(LocalDateTime.now())) {
@@ -103,19 +109,24 @@ public class GoalService {
         Goal goal = goalRepository.findById(goalId)
                 .orElseThrow(() -> new RuntimeException("Qol tapılmadı!"));
 
-        return goal.getVideoUrl(); // Premiumdursa video keçidini qaytarır
+        return goal.getVideoUrl();
     }
 
-    // Əkiz kodları aradan qaldırmaq üçün yardımçı mapping metodu
-    private GoalResponse mapToResponse(Goal goal) {
-        return new GoalResponse(
+    // Mapper: GoalVoteService vasitəsilə user-in səs verib-vermədiyini öyrənir
+    private GoalResponse mapToResponse(Goal goal, Long currentUserId) {
+        boolean hasVoted = goalVoteService.hasUserVoted(currentUserId, goal.getId());
+
+        GoalResponse response = new GoalResponse(
                 goal.getId(),
-                goal.getUser().getFullName(),
+                goal.getUser() != null ? goal.getUser().getFullName() : "Anonim",
                 goal.getVideoUrl(),
                 goal.getDescription(),
                 goal.getVotesCount(),
                 goal.getIsWeeklyWinner(),
                 goal.getCreatedAt()
         );
+
+        response.setHasVoted(hasVoted);
+        return response;
     }
 }
