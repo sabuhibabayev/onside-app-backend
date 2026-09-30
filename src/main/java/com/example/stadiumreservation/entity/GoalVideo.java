@@ -17,7 +17,8 @@ public class GoalVideo {
     private Long id;
 
     private String title;          // Qolun başlığı (məs: "Əli - Cərimə zərbəsi")
-    private String videoUrl;        // Buluddakı video linki (.mp4)
+    @Column(columnDefinition = "TEXT")
+    private String videoUrl;       // Buluddakı video linki (.mp4)
     private String ownerName;       // Stadionun və ya Owner-in adı
     private Long fieldId;           // Stadionun ID-si
 
